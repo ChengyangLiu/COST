@@ -17,17 +17,22 @@ use std::io::{BufReader, BufWriter, stdin, stdout};
 use byteorder::{WriteBytesExt, LittleEndian};
 
 static USAGE: &'static str = "
-Usage: compressed parse_to_hilbert
+Usage: compressed parse_to_hilbert <input> <output>
        compressed merge <source>...
        compressed scan
 ";
 
 fn main() {
     let args = Docopt::new(USAGE).and_then(|dopt| dopt.parse()).unwrap_or_else(|e| e.exit());
-
+    
+    // convert edge list to hilbert curve
+    // @input: edge file; format: src dst
+    // @output: hilbert curve compressed file
     if args.get_bool("parse_to_hilbert") {
-        let reader_mapper = ReaderMapper { reader: || BufReader::new(stdin())};
-        let mut writer = BufWriter::new(stdout());
+        // let reader_mapper = ReaderMapper { reader: || BufReader::new(stdin())};
+        // let mut writer = BufWriter::new(stdout());
+        let reader_mapper = ReaderMapper { reader: || BufReader::new(File::open(args.get_str("<input>")).unwrap())};
+        let mut writer = BufWriter::new(File::create(args.get_str("<output>")).unwrap());
 
         let mut prev = 0u64;
         to_hilbert(&reader_mapper, |next| {
@@ -37,8 +42,12 @@ fn main() {
         });
     }
 
+    // merge a list of hilbert curve compressed files which are compressed by gzip or others again to save space
+    // @input: delta-compressed files; format: a list of pathes
+    // @output: a merged hilbert curve compressed file
     if args.get_bool("merge") {
-        let mut writer = BufWriter::new(stdout());
+        // let mut writer = BufWriter::new(stdout());
+        let mut writer = BufWriter::new(File::create("my.comp-all").unwrap());
         let mut vector = Vec::new();
         for &source in args.get_vec("<source>").iter() {
             vector.push(Decoder::new(lz4::Decoder::new(BufReader::new(File::open(source).unwrap())).unwrap()));
